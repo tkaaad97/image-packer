@@ -1,0 +1,31 @@
+fn main() {
+    let matches = clap::App::new("image-packer")
+        .arg(
+            clap::Arg::new("texture-size")
+                .long("texture-size")
+                .short('s')
+                .value_delimiter(',')
+                .number_of_values(2)
+        )
+        .arg(
+            clap::Arg::new("texture-prefix")
+                .long("texture-prefix")
+                .takes_value(true)
+        )
+        .arg(
+            clap::Arg::new("spacing")
+                .long("spacing")
+                .takes_value(true)
+        )
+        .arg(
+            clap::Arg::new("input-path")
+                .takes_value(true)
+                .required(true)
+        )
+        .arg(
+            clap::Arg::new("output-path")
+                .takes_value(true)
+                .required(true)
+        )
+        .get_matches();
+}

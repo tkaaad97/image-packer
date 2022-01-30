@@ -1,0 +1,8 @@
+[package]
+name = "image-packer"
+version = "0.1.0"
+authors = ["tkaaad97 <tkaaad97@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+clap = { version = "^3.0.0", features = ["derive"] }
