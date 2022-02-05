@@ -1,4 +1,4 @@
-
+#[derive(Debug)]
 struct Args {
     prefix: String,
     number: usize,
@@ -62,10 +62,10 @@ fn parse_args() -> Result<Args, String> {
         if let Some(number_option) = matches.value_of("number") {
             let result = number_option.parse::<usize>();
             match result {
-                Result::Err(error) => {
-                    return Result::Err(format!("{}", error));
+                Err(error) => {
+                    return Err(format!("{}", error));
                 },
-                Result::Ok(number) => {
+                Ok(number) => {
                     args.number = number;
                 }
             }
@@ -79,24 +79,27 @@ fn parse_args() -> Result<Args, String> {
             match (width_range_option.next(), width_range_option.next()) {
                 (Some(min_width_option), Some(max_width_option)) => {
                     match min_width_option.parse::<usize>() {
-                        Result::Err(error) => {
-                            return Result::Err(format!("{}", error));
+                        Err(error) => {
+                            return Err(format!("{}", error));
                         }
-                        Result::Ok(min_width) => {
+                        Ok(min_width) => {
                             args.width_range[0] = min_width;
                         }
                     }
                     match max_width_option.parse::<usize>() {
-                        Result::Err(error) => {
-                            return Result::Err(format!("{}", error));
+                        Err(error) => {
+                            return Err(format!("{}", error));
                         }
-                        Result::Ok(max_width) => {
+                        Ok(max_width) => {
                             args.width_range[1] = max_width;
                         }
                     }
+                    if args.width_range[0] > args.width_range[1] {
+                        return Err(String::from("min width is larger than max width."));
+                    }
                 }
                 _ => {
-                    return Result::Err(String::from("Parse failed at width-range option"));
+                    return Err(String::from("Parse failed at width-range option"));
                 }
             }
         }
@@ -105,30 +108,39 @@ fn parse_args() -> Result<Args, String> {
             match (height_range_option.next(), height_range_option.next()) {
                 (Some(min_height_option), Some(max_height_option)) => {
                     match min_height_option.parse::<usize>() {
-                        Result::Err(error) => {
-                            return Result::Err(format!("{}", error));
+                        Err(error) => {
+                            return Err(format!("{}", error));
                         }
-                        Result::Ok(min_height) => {
+                        Ok(min_height) => {
                             args.height_range[0] = min_height;
                         }
                     }
                     match max_height_option.parse::<usize>() {
-                        Result::Err(error) => {
-                            return Result::Err(format!("{}", error));
+                        Err(error) => {
+                            return Err(format!("{}", error));
                         }
-                        Result::Ok(max_height) => {
+                        Ok(max_height) => {
                             args.height_range[1] = max_height;
                         }
                     }
+                    if args.height_range[0] > args.height_range[1] {
+                        return Err(String::from("min height is larger than max height."));
+                    }
                 }
                 _ => {
-                    return Result::Err(String::from("Parse failed at height-range option"));
+                    return Err(String::from("Parse failed at height-range option"));
                 }
             }
         }
 
-        return Result::Ok(args);
+        return Ok(args);
 }
 
-fn main() {
+fn image_gen(args: Args) {
+}
+
+fn main() -> Result<(), String> {
+    let args = parse_args()?;
+    image_gen(args);
+    return Ok(());
 }
