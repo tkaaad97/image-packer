@@ -5,4 +5,12 @@ authors = ["tkaaad97 <tkaaad97@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-clap = { version = "^3.0.0", features = ["derive"] }
+clap = "^3.0.0"
+image = "^0.24"
+rand = "^0.8"
+
+[[bin]]
+name = "image-gen"
+path = "src/bin/image-gen.rs"
+test = false
+bench = false
