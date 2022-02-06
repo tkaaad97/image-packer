@@ -1,10 +1,14 @@
+use image::{ImageFormat, ImageBuffer, Rgba};
+use rand::Rng;
+use std::path::Path;
+
 #[derive(Debug)]
 struct Args {
     prefix: String,
     number: usize,
     destination: String,
-    width_range: [usize; 2],
-    height_range: [usize; 2],
+    width_range: std::ops::Range<u32>,
+    height_range: std::ops::Range<u32>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -51,8 +55,8 @@ fn parse_args() -> Result<Args, String> {
             prefix: String::from("image"),
             number: 10,
             destination: String::from("."),
-            width_range: [32, 512],
-            height_range: [32, 512],
+            width_range: 32..(512 + 1),
+            height_range: 32..(512 + 1),
         };
 
         if let Some(prefix) = matches.value_of("prefix") {
@@ -78,23 +82,23 @@ fn parse_args() -> Result<Args, String> {
         if let Some(mut width_range_option) = matches.values_of("width-range") {
             match (width_range_option.next(), width_range_option.next()) {
                 (Some(min_width_option), Some(max_width_option)) => {
-                    match min_width_option.parse::<usize>() {
+                    match min_width_option.parse::<u32>() {
                         Err(error) => {
                             return Err(format!("{}", error));
                         }
                         Ok(min_width) => {
-                            args.width_range[0] = min_width;
+                            args.width_range.start = min_width;
                         }
                     }
-                    match max_width_option.parse::<usize>() {
+                    match max_width_option.parse::<u32>() {
                         Err(error) => {
                             return Err(format!("{}", error));
                         }
                         Ok(max_width) => {
-                            args.width_range[1] = max_width;
+                            args.width_range.end = max_width + 1;
                         }
                     }
-                    if args.width_range[0] > args.width_range[1] {
+                    if args.width_range.start > args.width_range.end {
                         return Err(String::from("min width is larger than max width."));
                     }
                 }
@@ -107,23 +111,23 @@ fn parse_args() -> Result<Args, String> {
         if let Some(mut height_range_option) = matches.values_of("height-range") {
             match (height_range_option.next(), height_range_option.next()) {
                 (Some(min_height_option), Some(max_height_option)) => {
-                    match min_height_option.parse::<usize>() {
+                    match min_height_option.parse::<u32>() {
                         Err(error) => {
                             return Err(format!("{}", error));
                         }
                         Ok(min_height) => {
-                            args.height_range[0] = min_height;
+                            args.height_range.start = min_height;
                         }
                     }
-                    match max_height_option.parse::<usize>() {
+                    match max_height_option.parse::<u32>() {
                         Err(error) => {
                             return Err(format!("{}", error));
                         }
                         Ok(max_height) => {
-                            args.height_range[1] = max_height;
+                            args.height_range.end = max_height + 1;
                         }
                     }
-                    if args.height_range[0] > args.height_range[1] {
+                    if args.height_range.start > args.height_range.end {
                         return Err(String::from("min height is larger than max height."));
                     }
                 }
@@ -137,10 +141,38 @@ fn parse_args() -> Result<Args, String> {
 }
 
 fn image_gen(args: Args) {
+    let mut rng = rand::thread_rng();
+    let dir_path = Path::new(&args.destination);
+    if !dir_path.is_dir() {
+        std::fs::create_dir(dir_path).unwrap();
+    }
+    let mut buffer = Vec::<u8>::with_capacity(((args.width_range.end - 1) as usize) * ((args.height_range.end - 1) as usize) * 4);
+    for _ in 0..buffer.capacity() {
+        buffer.push(0);
+    }
+
+    for i in 1..(args.number + 1) {
+        let path = dir_path.join(Path::new(&format!("{}{:03}", args.prefix, i))).with_extension("png");
+        let w: u32 = rng.gen_range(args.width_range.clone());
+        let h: u32 = rng.gen_range(args.height_range.clone());
+        let r: u8 = rng.gen();
+        let g: u8 = rng.gen();
+        let b: u8 = rng.gen();
+        let pixel_size = (w as usize) * (h as usize);
+        buffer.resize(pixel_size * 4, 0);
+        for p in 0..((w * h) as usize) {
+            buffer[p * 4] = r;
+            buffer[p * 4 + 1] = g;
+            buffer[p * 4 + 2] = b;
+            buffer[p * 4 + 3] = 255;
+        }
+        let image_buffer = ImageBuffer::<Rgba<u8>, _>::from_raw(w, h, buffer).unwrap();
+        image_buffer.save_with_format(path, ImageFormat::Png).unwrap();
+        buffer = image_buffer.into_vec();
+    }
 }
 
-fn main() -> Result<(), String> {
-    let args = parse_args()?;
+fn main() {
+    let args = parse_args().unwrap();
     image_gen(args);
-    return Ok(());
 }
