@@ -1,43 +1,52 @@
 use std::collections::btree_map::{BTreeMap};
 use std::ops::Bound::{Included, Unbounded};
 
-struct Packer {
-    texture_size: [usize; 2],
-    spacing: usize,
-    enable_rotate: bool,
+pub const MAX_TEXTURE_SIZE: usize = 4096;
+
+#[derive(Debug)]
+pub struct Packer {
+    pub texture_size: [usize; 2],
+    pub spacing: usize,
+    pub enable_rotate: bool,
 }
 
+#[derive(Debug)]
 struct Packed {
-    layouts: Vec<Layout>,
-    regions: Regions,
-}
-struct Layout {
-    index: usize,
-    position: [usize; 2],
-    rotated: bool,
+    pub layouts: Vec<Layout>,
+    pub regions: Regions,
 }
 
-struct Rect {
-    size: [usize; 2],
-    position: [usize; 2],
+#[derive(Debug)]
+pub struct Layout {
+    pub index: usize,
+    pub position: [usize; 2],
+    pub rotated: bool,
 }
-struct Regions {
+
+#[derive(Debug)]
+pub struct Rect {
+    pub size: [usize; 2],
+    pub position: [usize; 2],
+}
+
+#[derive(Debug)]
+pub(crate) struct Regions {
     regions: BTreeMap<usize, BTreeMap<usize, Vec<Rect>>>
 }
 
 impl Rect {
-    fn has_intersection(&self, other: &Rect) -> bool {
+    pub fn has_intersection(&self, other: &Rect) -> bool {
         let [w, h] = other.size;
         let [x, y] = other.position;
-        let [rx, ry] = self.position;
         let [rw, rh] = self.size;
+        let [rx, ry] = self.position;
         let (cx, cy) = (x * 2 + w, y * 2 + h);
         let (rcx, rcy) = (rx * 2 + rw, ry * 2 + rh);
         let (dx, dy) = ((if cx >= rcx {cx - rcx} else {rcx - cx}), if cy >= rcy {cy - rcy} else {rcy - cy});
         return dx < w + rw && dy < h + rh;
     }
 
-    fn include(&self, other: &Rect) -> bool {
+    pub fn include(&self, other: &Rect) -> bool {
         let [w, h] = other.size;
         let [x, y] = other.position;
         let [rx, ry] = self.position;
@@ -45,7 +54,7 @@ impl Rect {
         return rx <= x && x + w <= rx + rw && ry <= y && y + h <= ry + rh;
     }
 
-    fn divide(&self, other: &Rect) -> Vec<Rect> {
+    pub fn divide(&self, other: &Rect) -> Vec<Rect> {
         let mut rects: Vec<Rect> = Vec::with_capacity(2);
         let [w, h] = other.size;
         let [x, y] = other.position;
@@ -80,8 +89,7 @@ impl Rect {
             rects.push(Rect{ size, position });
         }
 
-        // no intersection
-        if rects.is_empty() {
+        if rects.is_empty() && !self.has_intersection(other) {
             rects.push(Rect {size: self.size, position: self.position});
         }
 
@@ -90,7 +98,7 @@ impl Rect {
 }
 
 impl Regions {
-    fn new(size: [usize; 2]) -> Regions {
+    pub fn new(size: [usize; 2]) -> Regions {
         let area = size[0] * size[1];
         let rect = Rect {
             size,
@@ -99,19 +107,19 @@ impl Regions {
         return Regions { regions: BTreeMap::from([(area, BTreeMap::from([(size[0], Vec::from([rect]))]))]) };
     }
 
-    fn find_space(&self, size: [usize; 2]) -> Option<Rect> {
+    pub fn find_space(&self, size: [usize; 2]) -> Option<Rect> {
         let area = size[0] * size[1];
-        for (area, regions_equal_area) in self.regions.range((Included(area), Unbounded)) {
+        for (region_area, regions_equal_area) in self.regions.range((Included(area), Unbounded)) {
             if let Some((_, found_regions)) = regions_equal_area
                     .range((Included(size[0]), Unbounded))
-                    .find(|(width, regions_equal_width)| !regions_equal_width.is_empty() && (**width >= size[0]) && (*area >= (size[1] * (**width)))) {
+                    .find(|(region_width, regions_equal_width)| !regions_equal_width.is_empty() && (**region_width >= size[0]) && (*region_area >= (size[1] * (**region_width)))) {
                 return Some(Rect{ size:found_regions[0].size, position: found_regions[0].position});
             }
         }
         return None;
     }
 
-    fn exclude(&mut self, other: &Rect) {
+    pub fn exclude(&mut self, other: &Rect) {
         let mut divided_regions: Vec<Rect> = Vec::new();
         for (_, regions_equal_area) in self.regions.iter_mut() {
             for (_, regions_equal_width) in regions_equal_area.into_iter() {
@@ -145,7 +153,7 @@ impl Regions {
         }
     }
 
-    fn add(&mut self, new_region: Rect) {
+    pub fn add(&mut self, new_region: Rect) {
         let area = new_region.size[0] * new_region.size[1];
         let width = new_region.size[0];
         for (_, regions_equal_area) in self.regions.range((Included(area), Unbounded)) {
@@ -174,29 +182,43 @@ impl Regions {
 }
 
 impl Packed {
-    fn new(texture_size: [usize; 2]) -> Packed {
+    pub fn new(texture_size: [usize; 2]) -> Packed {
         return Packed { layouts: Vec::new(), regions: Regions::new(texture_size) };
     }
 }
 
 impl Packer {
-    fn pack(
+    pub fn pack(
         &self,
         image_sizes: &Vec<[usize; 2]>
-    ) -> Result<Vec<Packed>, String> {
+    ) -> Result<Vec<Vec<Layout>>, String> {
         let mut results = Vec::new();
         let mut current = Packed::new(self.texture_size);
+
+        if self.texture_size[0] == 0 || self.texture_size[1] == 0 || self.texture_size[0] > MAX_TEXTURE_SIZE || self.texture_size[1] > MAX_TEXTURE_SIZE {
+            return Err(format!("bad texture size. {:?}", self));
+        }
+
+        if self.spacing >= self.texture_size[0] || self.spacing >= self.texture_size[1] {
+            return Err(format!("spacing too large. {:?}", self));
+        }
+
         for (index, size) in image_sizes.iter().enumerate() {
-            if size[0] + self.spacing > self.texture_size[0] || size[1] + self.spacing > self.texture_size[1] {
-                return Err(format!("pack failed. image size with spacing larger than texture size. ({}, {}) > ({}, {})", size[0] + self.spacing, size[1] + self.spacing, self.texture_size[0], self.texture_size[1]));
+            if size[0] > self.texture_size[0] || size[1] > self.texture_size[1] {
+                return Err(format!("pack failed. image size larger than texture size. ({}, {}) > ({}, {})", size[0], size[1], self.texture_size[0], self.texture_size[1]));
             }
             if !self.try_pack_one(&mut current, (index, size)) {
                 let mut next = Packed::new(self.texture_size);
                 std::mem::swap(&mut next, &mut current);
                 results.push(next);
+                self.try_pack_one(&mut current, (index, size));
             }
         }
-        return Ok(results);
+        if !current.layouts.is_empty() {
+            results.push(current);
+        }
+
+        return Ok(results.into_iter().map(|a|a.layouts).collect());
     }
 
     fn try_pack_one(
@@ -204,19 +226,19 @@ impl Packer {
         packed: &mut Packed,
         (index, size): (usize, &[usize; 2]),
     ) -> bool {
-        let size_with_spacing = [size[0] + self.spacing, size[1] + self.spacing];
+        let size_with_spacing = [std::cmp::min(size[0] + self.spacing, self.texture_size[0]), std::cmp::min(size[1] + self.spacing, self.texture_size[1])];
         if let Some(space) = packed.regions.find_space(size_with_spacing) {
             let layout = Layout{ index, position: space.position, rotated: false };
             packed.layouts.push(layout);
             packed.regions.exclude(&Rect{ position: space.position, size: size_with_spacing });
             return true;
         }
-        if self.enable_rotate {
-            let rotated_size = [size_with_spacing[1], size_with_spacing[0]];
+        if self.enable_rotate && size[1] <= self.texture_size[0] && size[0] <= self.texture_size[1] {
+            let rotated_size = [std::cmp::min(size[1] + self.spacing, self.texture_size[0]), std::cmp::min(size[0] + self.spacing, self.texture_size[1])];
             if let Some(space) = packed.regions.find_space(rotated_size) {
                 let layout = Layout{ index, position: space.position, rotated: true };
                 packed.layouts.push(layout);
-                packed.regions.exclude(&Rect{ position: space.position, size: size_with_spacing });
+                packed.regions.exclude(&Rect{ position: space.position, size: rotated_size });
                 return true;
             }
         }

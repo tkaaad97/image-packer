@@ -9,6 +9,9 @@ clap = "^3.0.0"
 image = "^0.24"
 rand = "^0.8"
 
+[dev-dependencies]
+proptest = "^1.0"
+
 [[bin]]
 name = "image-gen"
 path = "src/bin/image-gen.rs"
