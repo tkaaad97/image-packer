@@ -8,6 +8,7 @@ edition = "2018"
 clap = "^3.1.0"
 image = "^0.24"
 rand = "^0.8"
+regex = "^1.5"
 
 [dev-dependencies]
 proptest = "^1.0"
