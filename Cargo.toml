@@ -5,7 +5,7 @@ authors = ["tkaaad97 <tkaaad97@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-clap = "^3.0.0"
+clap = "^3.1.0"
 image = "^0.24"
 rand = "^0.8"
 

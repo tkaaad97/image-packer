@@ -15,7 +15,7 @@ struct Args {
 }
 
 fn parse_args() -> Result<Args> {
-    let matches = clap::App::new("image-gen")
+    let matches = clap::Command::new("image-gen")
         .about("Generate random size and color image files")
         .arg(
             clap::Arg::new("prefix")

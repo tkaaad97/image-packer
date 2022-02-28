@@ -1,5 +1,5 @@
 fn main() {
-    let matches = clap::App::new("image-packer")
+    let matches = clap::Command::new("image-packer")
         .arg(
             clap::Arg::new("texture-size")
                 .long("texture-size")
