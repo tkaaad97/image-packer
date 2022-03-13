@@ -60,7 +60,7 @@ impl Rect {
         return rx <= x && x + w <= rx + rw && ry <= y && y + h <= ry + rh;
     }
 
-    pub fn divide(&self, other: &Rect) -> Vec<Rect> {
+    pub fn divide(&self, other: &Rect, min_size: usize) -> Vec<Rect> {
         let mut rects: Vec<Rect> = Vec::with_capacity(2);
         let [w, h] = other.size;
         let [x, y] = other.position;
@@ -71,32 +71,42 @@ impl Rect {
         if rx < x && x < rx + rw {
             let size = [x - rx, rh];
             let position = [rx, ry];
-            rects.push(Rect{ size, position });
+            if size[0] >= min_size && size[1] >= min_size {
+                rects.push(Rect{ size, position });
+            }
         }
 
         // right
         if rx < x + w && x + w < rx + rw {
             let size = [rx + rw - (x + w), rh];
             let position = [x + w, ry];
-            rects.push(Rect{ size, position });
+            if size[0] >= min_size && size[1] >= min_size {
+                rects.push(Rect{ size, position });
+            }
         }
 
         // top
         if ry < y && y < ry + rh {
             let size = [rw, y - ry];
             let position = [rx, ry];
-            rects.push(Rect{ size, position });
+            if size[0] >= min_size && size[1] >= min_size {
+                rects.push(Rect{ size, position });
+            }
         }
 
         // bottom
         if ry < y + h && y + h < ry + rh {
             let size = [rw, ry + rh - (y + h)];
             let position = [rx, y + h];
-            rects.push(Rect{ size, position });
+            if size[0] >= min_size && size[1] >= min_size {
+                rects.push(Rect{ size, position });
+            }
         }
 
         if rects.is_empty() && !self.has_intersection(other) {
-            rects.push(Rect {size: self.size, position: self.position});
+            if self.size[0] >= min_size && self.size[1] >= min_size {
+                rects.push(Rect {size: self.size, position: self.position});
+            }
         }
 
         return rects;
@@ -125,7 +135,7 @@ impl Spaces {
         return None;
     }
 
-    pub fn exclude(&mut self, other: &Rect) {
+    pub fn exclude(&mut self, other: &Rect, min_size: usize) {
         let mut divided_spaces: Vec<Rect> = Vec::new();
         for (_, spaces_equal_area) in self.spaces.iter_mut() {
             for (_, spaces_equal_width) in spaces_equal_area.into_iter() {
@@ -133,7 +143,7 @@ impl Spaces {
                 for (i, space) in spaces_equal_width.into_iter().enumerate() {
                     if space.has_intersection(other) {
                         remove_indices.push(i);
-                        divided_spaces.append(&mut space.divide(&Rect{size: other.size, position: other.position}));
+                        divided_spaces.append(&mut space.divide(&Rect{size: other.size, position: other.position}, min_size));
                     }
                 }
 
@@ -199,7 +209,6 @@ impl Packer {
         image_sizes: &Vec<[usize; 2]>
     ) -> Result<Vec<Vec<Layout>>, String> {
         let mut results = Vec::new();
-        let mut current = Packed::new(self.texture_size);
         let mut images: Vec<Image> = image_sizes
                     .into_iter()
                     .enumerate()
@@ -215,6 +224,7 @@ impl Packer {
             return Err(format!("spacing too large. {:?}", self));
         }
 
+        let texture_size_with_spacing = [self.texture_size[0] + self.spacing, self.texture_size[1] + self.spacing];
         'image_loop: for image in images {
             if image.size[0] > self.texture_size[0] || image.size[1] > self.texture_size[1] {
                 return Err(format!("pack failed. image size larger than texture size. ({}, {}) > ({}, {})", image.size[0], image.size[1], self.texture_size[0], self.texture_size[1]));
@@ -226,15 +236,9 @@ impl Packer {
                 }
             }
 
-            if !self.try_pack_one(&mut current, &image) {
-                let mut next = Packed::new(self.texture_size);
-                std::mem::swap(&mut next, &mut current);
-                results.push(next);
-                self.try_pack_one(&mut current, &image);
-            }
-        }
-        if !current.layouts.is_empty() {
-            results.push(current);
+            let mut next = Packed::new(texture_size_with_spacing);
+            self.try_pack_one(&mut next, &image);
+            results.push(next);
         }
 
         return Ok(results.into_iter().map(|a|a.layouts).collect());
@@ -245,19 +249,20 @@ impl Packer {
         packed: &mut Packed,
         image: &Image,
     ) -> bool {
-        let size_with_spacing = [std::cmp::min(image.size[0] + self.spacing, self.texture_size[0]), std::cmp::min(image.size[1] + self.spacing, self.texture_size[1])];
+        let min_size = self.spacing + 1;
+        let size_with_spacing = [image.size[0] + self.spacing, image.size[1] + self.spacing];
         if let Some(space) = packed.spaces.find_space(size_with_spacing) {
             let layout = Layout{ index: image.index, position: space.position, rotated: false };
             packed.layouts.push(layout);
-            packed.spaces.exclude(&Rect{ position: space.position, size: size_with_spacing });
+            packed.spaces.exclude(&Rect{ position: space.position, size: size_with_spacing }, min_size);
             return true;
         }
         if self.enable_rotate && image.size[1] <= self.texture_size[0] && image.size[0] <= self.texture_size[1] {
-            let rotated_size = [std::cmp::min(image.size[1] + self.spacing, self.texture_size[0]), std::cmp::min(image.size[0] + self.spacing, self.texture_size[1])];
+            let rotated_size = [size_with_spacing[1], size_with_spacing[0]];
             if let Some(space) = packed.spaces.find_space(rotated_size) {
                 let layout = Layout{ index: image.index, position: space.position, rotated: true };
                 packed.layouts.push(layout);
-                packed.spaces.exclude(&Rect{ position: space.position, size: rotated_size });
+                packed.spaces.exclude(&Rect{ position: space.position, size: rotated_size }, min_size);
                 return true;
             }
         }
