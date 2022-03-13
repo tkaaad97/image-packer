@@ -215,10 +215,17 @@ impl Packer {
             return Err(format!("spacing too large. {:?}", self));
         }
 
-        for image in images {
+        'image_loop: for image in images {
             if image.size[0] > self.texture_size[0] || image.size[1] > self.texture_size[1] {
                 return Err(format!("pack failed. image size larger than texture size. ({}, {}) > ({}, {})", image.size[0], image.size[1], self.texture_size[0], self.texture_size[1]));
             }
+
+            for mut packed in results.iter_mut() {
+                if self.try_pack_one(&mut packed, &image) {
+                    continue 'image_loop;
+                }
+            }
+
             if !self.try_pack_one(&mut current, &image) {
                 let mut next = Packed::new(self.texture_size);
                 std::mem::swap(&mut next, &mut current);
