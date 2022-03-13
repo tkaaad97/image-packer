@@ -17,6 +17,12 @@ struct Packed {
 }
 
 #[derive(Debug)]
+struct Image {
+    index: usize,
+    size: [usize; 2],
+}
+
+#[derive(Debug)]
 pub struct Layout {
     pub index: usize,
     pub position: [usize; 2],
@@ -194,6 +200,12 @@ impl Packer {
     ) -> Result<Vec<Vec<Layout>>, String> {
         let mut results = Vec::new();
         let mut current = Packed::new(self.texture_size);
+        let mut images: Vec<Image> = image_sizes
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, size)|Image{ index, size: size.clone() })
+                    .collect();
+        images.sort_by(|a, b|(b.size[0] * b.size[1]).cmp(&(a.size[0] * a.size[1])));
 
         if self.texture_size[0] == 0 || self.texture_size[1] == 0 || self.texture_size[0] > MAX_TEXTURE_SIZE || self.texture_size[1] > MAX_TEXTURE_SIZE {
             return Err(format!("bad texture size. {:?}", self));
@@ -203,15 +215,15 @@ impl Packer {
             return Err(format!("spacing too large. {:?}", self));
         }
 
-        for (index, size) in image_sizes.iter().enumerate() {
-            if size[0] > self.texture_size[0] || size[1] > self.texture_size[1] {
-                return Err(format!("pack failed. image size larger than texture size. ({}, {}) > ({}, {})", size[0], size[1], self.texture_size[0], self.texture_size[1]));
+        for image in images {
+            if image.size[0] > self.texture_size[0] || image.size[1] > self.texture_size[1] {
+                return Err(format!("pack failed. image size larger than texture size. ({}, {}) > ({}, {})", image.size[0], image.size[1], self.texture_size[0], self.texture_size[1]));
             }
-            if !self.try_pack_one(&mut current, (index, size)) {
+            if !self.try_pack_one(&mut current, &image) {
                 let mut next = Packed::new(self.texture_size);
                 std::mem::swap(&mut next, &mut current);
                 results.push(next);
-                self.try_pack_one(&mut current, (index, size));
+                self.try_pack_one(&mut current, &image);
             }
         }
         if !current.layouts.is_empty() {
@@ -224,19 +236,19 @@ impl Packer {
     fn try_pack_one(
         &self,
         packed: &mut Packed,
-        (index, size): (usize, &[usize; 2]),
+        image: &Image,
     ) -> bool {
-        let size_with_spacing = [std::cmp::min(size[0] + self.spacing, self.texture_size[0]), std::cmp::min(size[1] + self.spacing, self.texture_size[1])];
+        let size_with_spacing = [std::cmp::min(image.size[0] + self.spacing, self.texture_size[0]), std::cmp::min(image.size[1] + self.spacing, self.texture_size[1])];
         if let Some(space) = packed.spaces.find_space(size_with_spacing) {
-            let layout = Layout{ index, position: space.position, rotated: false };
+            let layout = Layout{ index: image.index, position: space.position, rotated: false };
             packed.layouts.push(layout);
             packed.spaces.exclude(&Rect{ position: space.position, size: size_with_spacing });
             return true;
         }
-        if self.enable_rotate && size[1] <= self.texture_size[0] && size[0] <= self.texture_size[1] {
-            let rotated_size = [std::cmp::min(size[1] + self.spacing, self.texture_size[0]), std::cmp::min(size[0] + self.spacing, self.texture_size[1])];
+        if self.enable_rotate && image.size[1] <= self.texture_size[0] && image.size[0] <= self.texture_size[1] {
+            let rotated_size = [std::cmp::min(image.size[1] + self.spacing, self.texture_size[0]), std::cmp::min(image.size[0] + self.spacing, self.texture_size[1])];
             if let Some(space) = packed.spaces.find_space(rotated_size) {
-                let layout = Layout{ index, position: space.position, rotated: true };
+                let layout = Layout{ index: image.index, position: space.position, rotated: true };
                 packed.layouts.push(layout);
                 packed.spaces.exclude(&Rect{ position: space.position, size: rotated_size });
                 return true;
