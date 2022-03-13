@@ -14,44 +14,43 @@ struct Args {
     height_range: [u32; 2],
 }
 
-fn parse_args() -> Result<Args> {
-    let matches = clap::Command::new("image-gen")
-        .about("Generate random size and color image files")
-        .arg(
-            clap::Arg::new("prefix")
-                .long("prefix")
-                .short('p')
-                .takes_value(true)
-        )
-        .arg(
-            clap::Arg::new("number")
-                .long("number")
-                .short('n')
-                .takes_value(true)
-        )
-        .arg(
-            clap::Arg::new("destination")
-                .long("destination")
-                .short('d')
-                .takes_value(true)
-        )
-        .arg(
-            clap::Arg::new("width-range")
-                .long("width-range")
-                .short('w')
-                .takes_value(true)
-                .value_delimiter(',')
-                .number_of_values(2)
-        )
-        .arg(
-            clap::Arg::new("height-range")
-                .long("height-range")
-                .short('h')
-                .takes_value(true)
-                .value_delimiter(',')
-                .number_of_values(2)
-        )
-        .get_matches();
+impl Args {
+    fn parse() -> Result<Args> {
+        let matches = clap::Command::new("image-gen")
+            .about("Generate random size and color image files")
+            .arg(
+                clap::Arg::new("prefix")
+                    .long("prefix")
+                    .short('p')
+                    .takes_value(true)
+            )
+            .arg(
+                clap::Arg::new("number")
+                    .long("number")
+                    .short('n')
+                    .takes_value(true)
+            )
+            .arg(
+                clap::Arg::new("destination")
+                    .long("destination")
+                    .short('d')
+                    .takes_value(true)
+            )
+            .arg(
+                clap::Arg::new("width-range")
+                    .long("width-range")
+                    .takes_value(true)
+                    .value_delimiter(',')
+                    .number_of_values(2)
+            )
+            .arg(
+                clap::Arg::new("height-range")
+                    .long("height-range")
+                    .takes_value(true)
+                    .value_delimiter(',')
+                    .number_of_values(2)
+            )
+            .get_matches();
 
         // default option values
         let mut args = Args {
@@ -92,6 +91,7 @@ fn parse_args() -> Result<Args> {
         }
 
         return Ok(args);
+    }
 }
 
 fn image_gen(args: Args) -> Result<()> {
@@ -130,7 +130,7 @@ fn image_gen(args: Args) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let args = parse_args()?;
+    let args = Args::parse()?;
     image_gen(args)?;
     Ok(())
 }
