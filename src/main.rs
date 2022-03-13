@@ -1,4 +1,4 @@
-use image::{GenericImage, GenericImageView, ImageFormat, ImageBuffer, Rgba};
+use image::{GenericImage, ImageFormat, ImageBuffer, Rgba};
 use image_packer::*;
 use regex::Regex;
 use std::path::{Path, PathBuf};
@@ -120,10 +120,10 @@ fn main() -> Result<()> {
     input_paths.sort();
 
     // load input images
-    let mut images = Vec::<image::DynamicImage>::new();
+    let mut images = Vec::<image::ImageBuffer<Rgba<u8>, _>>::new();
     let mut image_sizes = Vec::<[usize; 2]>::new();
     for path in input_paths {
-        let image = image::open(path)?;
+        let image = image::open(path)?.to_rgba8();
         image_sizes.push([image.width() as usize, image.height() as usize]);
         images.push(image);
     }
@@ -149,9 +149,7 @@ fn main() -> Result<()> {
                 .ok_or(str_to_error("textrue initialize error"))?;
 
         for layout in layouts {
-            let image = &images[layout.index];
-            let source_image = image.to_rgba8();
-            texture.copy_from(&source_image, layout.position[0] as u32, layout.position[1] as u32)?;
+            texture.copy_from(&images[layout.index], layout.position[0] as u32, layout.position[1] as u32)?;
         }
 
         let texture_path = output_dir.join(Path::new(&format!("{}{:03}", args.prefix, texture_index))).with_extension("png");
